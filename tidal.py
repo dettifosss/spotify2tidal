@@ -8,7 +8,7 @@ from pathlib import Path
 
 import tidalapi
 
-from matching import classify_name_match
+from matching import artist_matches, classify_name_match, score_name_similarity
 from models import Playlist, Track
 
 # Token cache written next to this file; gitignored
@@ -105,7 +105,7 @@ DEFAULT_MATCH_WORKERS = 8
 _match_cache: dict[str, tuple[str | None, str | None, bool | None]] = {}
 _cache_lock = threading.Lock()
 
-MatchResult = tuple[str | None, str | None, bool | None, str | None, str | None, str | None, str | None]  # (tidal_id, method, available, tidal_isrc, tidal_name, tidal_artist, name_match)
+MatchResult = tuple[str | None, str | None, bool | None, str | None, str | None, str | None, str | None, float | None]  # (tidal_id, method, available, tidal_isrc, tidal_name, tidal_artist, name_match, name_similarity)
 
 
 def _cache_key(track: Track) -> str:
@@ -143,7 +143,7 @@ def _do_match(session: tidalapi.Session, track: Track) -> MatchResult:
                 available = [t for t in hits if getattr(t, "available", True)]
                 best = available[0] if available else hits[0]
                 tidal_artist = best.artist.name if getattr(best, "artist", None) else None
-                return str(best.id), "isrc", bool(getattr(best, "available", True)), getattr(best, "isrc", None), getattr(best, "name", None), tidal_artist, None
+                return str(best.id), "isrc", bool(getattr(best, "available", True)), getattr(best, "isrc", None), getattr(best, "name", None), tidal_artist, None, None
         except Exception:
             pass
 
@@ -156,12 +156,13 @@ def _do_match(session: tidalapi.Session, track: Track) -> MatchResult:
             hits = results.get("tracks", [])
             if hits:
                 name_match = classify_name_match(track.name, hits[0].name)
+                name_similarity = score_name_similarity(track.name, hits[0].name)
                 tidal_artist = hits[0].artist.name if getattr(hits[0], "artist", None) else None
-                return str(hits[0].id), "search", bool(getattr(hits[0], "available", True)), getattr(hits[0], "isrc", None), getattr(hits[0], "name", None), tidal_artist, name_match
+                return str(hits[0].id), "search", bool(getattr(hits[0], "available", True)), getattr(hits[0], "isrc", None), getattr(hits[0], "name", None), tidal_artist, name_match, name_similarity
         except Exception:
             pass
 
-    return None, "not_found", None, None, None, None, None
+    return None, "not_found", None, None, None, None, None, None
 
 
 def match_playlists(
@@ -227,7 +228,7 @@ def match_playlists(
             try:
                 _, result = future.result()
             except Exception:
-                result = (None, "not_found", None, None, None, None, None)
+                result = (None, "not_found", None, None, None, None, None, None)
                 with _cache_lock:
                     _match_cache[key] = result
             _apply_result(key_to_tracks[key], result)
@@ -237,7 +238,7 @@ def match_playlists(
 
 
 def _apply_result(tracks: list[Track], result: MatchResult) -> None:
-    tidal_id, method, available, tidal_isrc, tidal_name, tidal_artist, name_match = result
+    tidal_id, method, available, tidal_isrc, tidal_name, tidal_artist, name_match, name_similarity = result
     for track in tracks:
         track.tidal_id = tidal_id
         track.tidal_match_method = method
@@ -246,3 +247,8 @@ def _apply_result(tracks: list[Track], result: MatchResult) -> None:
         track.tidal_name = tidal_name
         track.tidal_artist = tidal_artist
         track.tidal_name_match = name_match
+        track.tidal_name_similarity = name_similarity
+        if method == "search" and tidal_artist:
+            track.tidal_artist_match = artist_matches(track.artists, tidal_artist)
+        else:
+            track.tidal_artist_match = None

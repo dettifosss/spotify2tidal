@@ -3,6 +3,8 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
+from rapidfuzz import fuzz
+
 _RULES_PATH = Path(__file__).parent / "name_match_rules.toml"
 
 
@@ -50,6 +52,13 @@ def _strip_suffixes(s: str) -> str:
     return s
 
 
+def _norm(s: str) -> str:
+    """Strip suffixes then remove punctuation for loose base-name comparison."""
+    base = _strip_suffixes(s)
+    base = re.sub(r'[^\w\s]', '', base)
+    return re.sub(r'\s+', ' ', base).strip()
+
+
 def _strip_feat(s: str) -> str:
     """Remove featured artist references from a name string."""
     # Parenthetical form: "(feat. X)" / "[featuring X]" etc.
@@ -79,22 +88,56 @@ def classify_name_match(name_a: str, name_b: str) -> str:
         b_hit = bool(rule.pattern.search(b))
         match rule.mode:
             case "any" if a_hit or b_hit:
-                # Guard: base names must match after stripping suffixes —
+                # Guard: base names must match after stripping suffixes and punctuation —
                 # prevents "Unbreakable - Remix" matching "Other Song (Remix)"
-                if _strip_suffixes(a) == _strip_suffixes(b):
+                if _norm(a) == _norm(b):
                     return rule.key
             case "asymmetric" if a_hit != b_hit:
-                if _strip_suffixes(a) == _strip_suffixes(b):
+                if _norm(a) == _norm(b):
                     return rule.key
             case "feat":
-                a_norm = _strip_feat(a)
-                b_norm = _strip_feat(b)
+                a_nofeat = _strip_feat(a)
+                b_nofeat = _strip_feat(b)
                 # Only fire if something was stripped AND the bases now match
-                if (a_norm != a or b_norm != b) and _strip_suffixes(a_norm) == _strip_suffixes(b_norm):
+                if (a_nofeat != a or b_nofeat != b) and _norm(a_nofeat) == _norm(b_nofeat):
                     return rule.key
 
-    # Structural fallback: strip remaster/year/other suffixes and compare bases
+    # Structural fallback: strip remaster/year/other suffixes and compare bases.
+    # Uses exact equality (not _norm) so that punctuation-only differences like
+    # "Love Rocket!" vs "Love Rocket" fall through to "search" rather than
+    # being mislabelled as a version mismatch.
     if _strip_suffixes(a) == _strip_suffixes(b):
         return "version_mismatch"
 
     return "search"  # base names differ — unclassified
+
+
+def _norm_artist(s: str) -> str:
+    """Casefold and remove all non-alphanumeric characters for artist comparison.
+
+    Handles hyphens ("Jay-Z" → "jayz"), slashes ("AC/DC" → "acdc"),
+    apostrophes, and casing differences.
+    """
+    return re.sub(r'[^a-z0-9]', '', s.lower())
+
+
+def artist_matches(spotify_artists: list[str], tidal_artist: str) -> bool:
+    """Return True if any Spotify artist matches the Tidal primary artist.
+
+    Uses normalized comparison (casefold + strip punctuation/spaces) so minor
+    formatting differences don't produce false mismatches.
+    """
+    td = _norm_artist(tidal_artist)
+    return any(_norm_artist(a) == td for a in spotify_artists)
+
+
+def score_name_similarity(name_a: str, name_b: str) -> float:
+    """Return a 0–100 similarity score between two track names.
+
+    Strips suffixes and featured-artist references before scoring so that
+    "Song (feat. X) [2018 Remaster]" vs "Song" scores near 100 rather than
+    being penalised for the extra tokens.
+    """
+    a = _strip_suffixes(_strip_feat(name_a.strip().lower()))
+    b = _strip_suffixes(_strip_feat(name_b.strip().lower()))
+    return fuzz.token_sort_ratio(a, b)

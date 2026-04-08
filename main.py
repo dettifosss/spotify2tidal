@@ -44,8 +44,9 @@ def _verbose_attention(p: Playlist) -> None:
         sp_isrc = (t.isrc or "").ljust(12)
         td_isrc = (t.tidal_isrc or "").ljust(12)
         td_artist = t.tidal_artist or "Unknown artist"
+        sim = f"  [sim: {round(t.tidal_name_similarity)}]" if t.tidal_name_similarity is not None else ""
         sp_line = f"      SP  {sp_isrc}  {sp_artist} - {t.name}"
-        td_line = f"      TD  {td_isrc}  {td_artist} - {t.tidal_name or '—'}"
+        td_line = f"      TD  {td_isrc}  {td_artist} - {t.tidal_name or '—'}{sim}"
         return f"{sp_line}\n{td_line}"
 
     known_keys = frozenset(r.key for r in NAME_MATCH_RULES) | {"exact"}
@@ -62,6 +63,9 @@ def _verbose_attention(p: Playlist) -> None:
         },
         "Search: unverified (fuzzy name match)": [
             t for t in p.tracks if t.tidal_match_method == "search" and t.tidal_name_match not in known_keys
+        ],
+        "Search: artist mismatch": [
+            t for t in p.tracks if t.tidal_match_method == "search" and t.tidal_artist_match is False
         ],
         "Unavailable on Spotify": [
             t for t in p.tracks if not t.is_available

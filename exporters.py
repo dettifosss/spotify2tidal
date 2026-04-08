@@ -33,6 +33,8 @@ class CSVExporter(BaseExporter):
         "tidal_is_available",
         "tidal_isrc",
         "tidal_name_match",
+        "tidal_name_similarity",
+        "tidal_artist_match",
     ]
 
     def export(self, playlists: list[Playlist], output_dir: str) -> None:
@@ -59,6 +61,8 @@ class CSVExporter(BaseExporter):
                         "tidal_is_available": "" if track.tidal_is_available is None else track.tidal_is_available,
                         "tidal_isrc": track.tidal_isrc or "",
                         "tidal_name_match": track.tidal_name_match or "",
+                        "tidal_name_similarity": "" if track.tidal_name_similarity is None else round(track.tidal_name_similarity),
+                        "tidal_artist_match": "" if track.tidal_artist_match is None else track.tidal_artist_match,
                     })
 
 

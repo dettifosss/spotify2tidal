@@ -1,3 +1,5 @@
+import re
+
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 
@@ -17,6 +19,22 @@ def create_client(client_id: str, client_secret: str, redirect_uri: str) -> spot
         scope=" ".join(SCOPES),
     )
     return spotipy.Spotify(auth_manager=auth)
+
+
+def _normalize_isrc(raw: str | None) -> str | None:
+    """Normalize a raw ISRC string to the compact 12-character uppercase form.
+
+    Handles:
+    - Leading punctuation/colons (e.g. ':NL-L56-08-01386')
+    - Hyphenated form (e.g. 'NL-L56-08-01386' → 'NLL560801386')
+    - Lowercase (e.g. 'uscgj1291908' → 'USCGJ1291908')
+
+    Returns None if the result isn't exactly 12 alphanumeric characters.
+    """
+    if not raw:
+        return None
+    normalized = re.sub(r'[^A-Za-z0-9]', '', raw).upper()
+    return normalized if len(normalized) == 12 else None
 
 
 def _parse_track(item: dict, market: str | None) -> Track:
@@ -57,7 +75,7 @@ def _parse_track(item: dict, market: str | None) -> Track:
 
     artists = [a["name"] for a in track.get("artists") or []]
     album = (track.get("album") or {}).get("name", "")
-    isrc: str | None = (track.get("external_ids") or {}).get("isrc")
+    isrc: str | None = _normalize_isrc((track.get("external_ids") or {}).get("isrc"))
 
     # is_playable is only present when a market was requested
     if market is not None:

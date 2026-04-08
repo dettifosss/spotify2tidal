@@ -37,6 +37,12 @@ class Track:
     # "feat_variant"     — either name contains feat./featuring/ft. (likely correct, different formatting)
     # "remaster"         — either name contains a "Remaster/Remastered" pattern
     tidal_name_match: str | None = None
+    # 0–100 rapidfuzz token_sort_ratio on stripped base names; only set for search-method matches
+    tidal_name_similarity: float | None = None
+    # True  = at least one Spotify artist matches the Tidal primary artist (normalized)
+    # False = no Spotify artist matches the Tidal primary artist
+    # None  = ISRC match, not_found, or no tidal_artist available
+    tidal_artist_match: bool | None = None
 
 
 @dataclass
