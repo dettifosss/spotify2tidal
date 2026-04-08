@@ -28,6 +28,9 @@ class CSVExporter(BaseExporter):
         "spotify_id",
         "is_available",
         "is_local",
+        "tidal_id",
+        "tidal_match_method",
+        "tidal_is_available",
     ]
 
     def export(self, playlists: list[Playlist], output_dir: str) -> None:
@@ -49,6 +52,9 @@ class CSVExporter(BaseExporter):
                         "spotify_id": track.spotify_id or "",
                         "is_available": track.is_available,
                         "is_local": track.is_local,
+                        "tidal_id": track.tidal_id or "",
+                        "tidal_match_method": track.tidal_match_method or "",
+                        "tidal_is_available": "" if track.tidal_is_available is None else track.tidal_is_available,
                     })
 
 
