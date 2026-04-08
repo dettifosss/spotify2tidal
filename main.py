@@ -2,8 +2,27 @@ import click
 
 import config as cfg_module
 from exporters import EXPORTERS
+from models import Playlist
 from spotify import create_client, fetch_playlist_tracks, fetch_single_playlist, fetch_user_playlists
 from tidal import create_client as create_tidal_client, match_playlists
+
+
+def _playlist_summary(p: Playlist) -> str:
+    tracks = p.tracks
+    total = len(tracks)
+    spotify_avail = sum(1 for t in tracks if t.is_available)
+    isrc     = sum(1 for t in tracks if t.tidal_match_method == "isrc")
+    search   = sum(1 for t in tracks if t.tidal_match_method == "search")
+    unavail  = sum(1 for t in tracks if t.tidal_id and not t.tidal_is_available)
+    not_found = sum(1 for t in tracks if t.tidal_match_method == "not_found")
+    tidal_avail = isrc + search - unavail
+    return (
+        f"  {p.name}: {total} tracks | "
+        f"Spotify: {spotify_avail} avail | "
+        f"Tidal: {tidal_avail} avail ({isrc} ISRC, {search} search)"
+        + (f", {unavail} unavail" if unavail else "")
+        + (f", {not_found} not found" if not_found else "")
+    )
 
 
 @click.command()
@@ -205,14 +224,8 @@ def main(
         match_playlists(tidal, playlists, on_progress=on_progress)
         click.echo()  # newline after the in-place progress line
 
-        total_tracks = sum(len(p.tracks) for p in playlists)
-        matched = sum(1 for p in playlists for t in p.tracks if t.tidal_id)
-        unmatched = total_tracks - matched
-        click.echo(
-            f"Tidal matching complete: {matched}/{total_tracks} matched"
-            + (f", {unmatched} unmatched" if unmatched else "")
-            + "."
-        )
+        for p in playlists:
+            click.echo(_playlist_summary(p))
 
     exporter = EXPORTERS[export_format]
     exporter.export(playlists, output_dir)
