@@ -270,7 +270,7 @@ def main(
         if list_only:
             for p in playlists:
                 tag = "owned" if p.is_owned else "followed"
-                click.echo(f"  [{tag}] {p.name}  ({p.total_tracks} tracks)")
+                click.echo(f"  [{tag}] {p.id}  {p.name}  ({p.total_tracks} tracks)")
             return
 
         for i, playlist in enumerate(playlists, 1):
