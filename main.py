@@ -4,7 +4,8 @@ import config as cfg_module
 from exporters import EXPORTERS
 from models import Playlist
 from spotify import create_client, fetch_playlist_tracks, fetch_single_playlist, fetch_user_playlists
-from tidal import NAME_MATCH_RULES, create_client as create_tidal_client, match_playlists
+from matching import NAME_MATCH_RULES
+from tidal import create_client as create_tidal_client, match_playlists
 
 
 def _playlist_summary(p: Playlist) -> str:
