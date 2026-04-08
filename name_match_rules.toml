@@ -1,0 +1,42 @@
+# Name match rules for comparing Spotify and Tidal track names.
+# Rules are evaluated in order — first match wins.
+# Adding a new rule here is all that's needed; matching.py, main.py and the
+# summary/verbose output all derive their behaviour from this file.
+#
+# Fields:
+#   key     — value stored in tidal_name_match; used in CSV and code comparisons
+#   label   — verbose output group heading (prefixed with "Search: ")
+#   summary — short label used in the per-playlist summary line
+#   pattern — Python regex; re.IGNORECASE is always applied
+#   mode    — "any":        fires if EITHER name matches the pattern
+#             "asymmetric": fires if EXACTLY ONE name matches the pattern
+
+[[rules]]
+key     = "mix_mismatch"
+label   = "mix mismatch (likely wrong track)"
+summary = "mix"
+pattern = '\b(?:re)?mix\b'
+mode    = "any"
+
+[[rules]]
+key     = "radio_edit"
+label   = "radio edit mismatch"
+summary = "radio edit"
+# Phrase form avoids false positives on titles like "Radio Gaga"
+pattern = '\bradio\s+(?:edit|version)\b'
+mode    = "asymmetric"
+
+[[rules]]
+key     = "version_mismatch"
+label   = "version mismatch (different edition)"
+summary = "version"
+pattern = '\b(?:live|demo|acoustic|outtake|concert|session|instrumental|reprise|bonus|extended|rehearsal)\b'
+mode    = "asymmetric"
+
+[[rules]]
+key     = "remaster"
+label   = "remaster mismatch"
+summary = "remaster"
+# Requires a 4-digit year prefix so bare "(Remaster)" falls through to suffix stripping
+pattern = '\b\d{4}\s+remaster(?:ed)?\b'
+mode    = "any"

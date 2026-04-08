@@ -1,5 +1,9 @@
 import re
+import tomllib
 from dataclasses import dataclass
+from pathlib import Path
+
+_RULES_PATH = Path(__file__).parent / "name_match_rules.toml"
 
 
 @dataclass(frozen=True)
@@ -12,42 +16,22 @@ class NameMatchRule:
                         # "asymmetric": fires if exactly one name matches
 
 
-# Rules are checked in order; first match wins.
-# To add a new classification: append a NameMatchRule here — nothing else needs changing.
-NAME_MATCH_RULES: list[NameMatchRule] = [
-    NameMatchRule(
-        key="mix_mismatch",
-        label="mix mismatch (likely wrong track)",
-        summary="mix",
-        pattern=re.compile(r'\b(?:re)?mix\b', re.IGNORECASE),
-        mode="any",
-    ),
-    NameMatchRule(
-        key="radio_edit",
-        label="radio edit mismatch",
-        summary="radio edit",
-        # Phrase form avoids false positives on titles like "Radio Gaga"
-        pattern=re.compile(r'\bradio\s+(?:edit|version)\b', re.IGNORECASE),
-        mode="asymmetric",
-    ),
-    NameMatchRule(
-        key="version_mismatch",
-        label="version mismatch (different edition)",
-        summary="version",
-        pattern=re.compile(
-            r'\b(?:live|demo|acoustic|outtake|concert|session|instrumental|reprise|bonus|extended|rehearsal)\b',
-            re.IGNORECASE,
-        ),
-        mode="asymmetric",
-    ),
-    NameMatchRule(
-        key="remaster",
-        label="remaster mismatch",
-        summary="remaster",
-        pattern=re.compile(r'\b\d{4}\s+remaster(?:ed)?\b', re.IGNORECASE),
-        mode="any",
-    ),
-]
+def _load_rules() -> list[NameMatchRule]:
+    with open(_RULES_PATH, "rb") as f:
+        data = tomllib.load(f)
+    return [
+        NameMatchRule(
+            key=r["key"],
+            label=r["label"],
+            summary=r["summary"],
+            pattern=re.compile(r["pattern"], re.IGNORECASE),
+            mode=r["mode"],
+        )
+        for r in data["rules"]
+    ]
+
+
+NAME_MATCH_RULES: list[NameMatchRule] = _load_rules()
 
 
 def _strip_suffixes(s: str) -> str:
