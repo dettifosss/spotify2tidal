@@ -32,6 +32,7 @@ class Track:
     # "exact"            — track names match exactly (case-insensitive)
     # "version_mismatch" — same base name, differs only by parenthetical/remaster suffix
     # "mix_mismatch"     — one or both names contain a mix/remix indicator
+    # "original_mix"     — one name has "Original Mix", the other is clean (likely correct)
     # "radio_edit"       — one name contains "Radio Edit" / "Radio Version", other doesn't
     # "feat_variant"     — either name contains feat./featuring/ft. (likely correct, different formatting)
     # "remaster"         — either name contains a "Remaster/Remastered" pattern

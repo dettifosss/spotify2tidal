@@ -15,8 +15,17 @@
 key     = "mix_mismatch"
 label   = "mix mismatch (likely wrong track)"
 summary = "mix"
-pattern = '\b(?:re)?mix\b'
+# Negative lookbehind excludes "Original Mix" — that case is handled by original_mix below
+pattern = '(?<!original )\b(?:re)?mix\b'
 mode    = "any"
+
+[[rules]]
+key     = "original_mix"
+label   = "original mix (likely correct)"
+summary = "original mix"
+# Fires when exactly one name has "Original Mix" and the other is clean
+pattern = '\boriginal\s+mix\b'
+mode    = "asymmetric"
 
 [[rules]]
 key     = "radio_edit"
