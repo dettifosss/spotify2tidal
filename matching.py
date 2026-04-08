@@ -79,9 +79,13 @@ def classify_name_match(name_a: str, name_b: str) -> str:
         b_hit = bool(rule.pattern.search(b))
         match rule.mode:
             case "any" if a_hit or b_hit:
-                return rule.key
+                # Guard: base names must match after stripping suffixes —
+                # prevents "Unbreakable - Remix" matching "Other Song (Remix)"
+                if _strip_suffixes(a) == _strip_suffixes(b):
+                    return rule.key
             case "asymmetric" if a_hit != b_hit:
-                return rule.key
+                if _strip_suffixes(a) == _strip_suffixes(b):
+                    return rule.key
             case "feat":
                 a_norm = _strip_feat(a)
                 b_norm = _strip_feat(b)
