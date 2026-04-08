@@ -1,15 +1,14 @@
 import contextlib
 import json
 import logging
-import re
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
 import tidalapi
 
+from matching import classify_name_match
 from models import Playlist, Track
 
 # Token cache written next to this file; gitignored
@@ -109,81 +108,6 @@ _cache_lock = threading.Lock()
 MatchResult = tuple[str | None, str | None, bool | None, str | None, str | None, str | None]  # (tidal_id, method, available, tidal_isrc, tidal_name, name_match)
 
 
-@dataclass(frozen=True)
-class NameMatchRule:
-    key: str            # value stored in tidal_name_match
-    label: str          # verbose group label (appended to "Search: ")
-    summary: str        # short form used in the playlist summary line
-    pattern: re.Pattern
-    mode: str           # "any": fires if either name matches
-                        # "asymmetric": fires if exactly one name matches
-
-
-# Rules are checked in order; first match wins.
-# To add a new classification: append a NameMatchRule here — nothing else needs changing.
-NAME_MATCH_RULES: list[NameMatchRule] = [
-    NameMatchRule(
-        key="mix_mismatch",
-        label="mix mismatch (likely wrong track)",
-        summary="mix",
-        pattern=re.compile(r'\b(?:re)?mix\b', re.IGNORECASE),
-        mode="any",
-    ),
-    NameMatchRule(
-        key="radio_edit",
-        label="radio edit mismatch",
-        summary="radio edit",
-        # Phrase form avoids false positives on titles like "Radio Gaga"
-        pattern=re.compile(r'\bradio\s+(?:edit|version)\b', re.IGNORECASE),
-        mode="asymmetric",
-    ),
-    NameMatchRule(
-        key="version_mismatch",
-        label="version mismatch (different edition)",
-        summary="version",
-        pattern=re.compile(
-            r'\b(?:live|demo|acoustic|outtake|concert|session|instrumental|reprise|bonus|extended|rehearsal)\b',
-            re.IGNORECASE,
-        ),
-        mode="asymmetric",
-    ),
-]
-
-def _strip_suffixes(s: str) -> str:
-    """Strip trailing parenthetical/bracket groups and ' - <suffix>' iteratively."""
-    prev = None
-    while prev != s:
-        prev = s
-        s = re.sub(r'\s*-\s+\S.*$', '', s)                # " - 2018 Remaster"
-        s = re.sub(r'\s*[\(\[][^\)\]]+[\)\]]\s*$', '', s)  # trailing (...) or [...]
-        s = s.strip()
-    return s
-
-
-def _classify_name_match(spotify_name: str, tidal_name: str) -> str:
-    """Classify the name similarity between a Spotify and Tidal track name."""
-    sp = spotify_name.strip().lower()
-    td = tidal_name.strip().lower()
-
-    if sp == td:
-        return "exact"
-
-    for rule in NAME_MATCH_RULES:
-        sp_hit = bool(rule.pattern.search(sp))
-        td_hit = bool(rule.pattern.search(td))
-        match rule.mode:
-            case "any" if sp_hit or td_hit:
-                return rule.key
-            case "asymmetric" if sp_hit != td_hit:
-                return rule.key
-
-    # Structural fallback: strip remaster/year/other suffixes and compare bases
-    if _strip_suffixes(sp) == _strip_suffixes(td):
-        return "version_mismatch"
-
-    return "search"  # base names differ — unclassified
-
-
 def _cache_key(track: Track) -> str:
     """Stable dedup/cache key for a track.
 
@@ -230,7 +154,7 @@ def _do_match(session: tidalapi.Session, track: Track) -> MatchResult:
             results = session.search(query, models=[tidalapi.Track], limit=1)
             hits = results.get("tracks", [])
             if hits:
-                name_match = _classify_name_match(track.name, hits[0].name)
+                name_match = classify_name_match(track.name, hits[0].name)
                 return str(hits[0].id), "search", bool(getattr(hits[0], "available", True)), getattr(hits[0], "isrc", None), getattr(hits[0], "name", None), name_match
         except Exception:
             pass
