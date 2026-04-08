@@ -11,9 +11,9 @@ def _playlist_summary(p: Playlist) -> str:
     tracks = p.tracks
     total = len(tracks)
     spotify_avail = sum(1 for t in tracks if t.is_available)
-    isrc     = sum(1 for t in tracks if t.tidal_match_method == "isrc")
-    search   = sum(1 for t in tracks if t.tidal_match_method == "search")
-    unavail  = sum(1 for t in tracks if t.tidal_id and not t.tidal_is_available)
+    isrc      = sum(1 for t in tracks if t.tidal_match_method == "isrc")
+    search    = sum(1 for t in tracks if t.tidal_match_method == "search")
+    unavail   = sum(1 for t in tracks if t.tidal_id and not t.tidal_is_available)
     not_found = sum(1 for t in tracks if t.tidal_match_method == "not_found")
     tidal_avail = isrc + search - unavail
     return (
@@ -23,6 +23,39 @@ def _playlist_summary(p: Playlist) -> str:
         + (f", {unavail} unavail" if unavail else "")
         + (f", {not_found} not found" if not_found else "")
     )
+
+
+def _verbose_attention(p: Playlist) -> None:
+    """Print tracks needing attention for a playlist, grouped by issue."""
+    def _fmt(t) -> str:
+        artists = ", ".join(t.artists) if t.artists else "Unknown artist"
+        isrc = f"  ISRC: {t.isrc}" if t.isrc else ""
+        return f"      {t.name} — {artists}{isrc}"
+
+    groups = {
+        "Not found on Tidal": [
+            t for t in p.tracks if t.tidal_match_method == "not_found"
+        ],
+        "On Tidal but unavailable in your region": [
+            t for t in p.tracks if t.tidal_id and not t.tidal_is_available
+        ],
+        "Matched via search only (verify)": [
+            t for t in p.tracks if t.tidal_match_method == "search"
+        ],
+        "Unavailable on Spotify": [
+            t for t in p.tracks if not t.is_available
+        ],
+    }
+
+    attention = {label: tracks for label, tracks in groups.items() if tracks}
+    if not attention:
+        return
+
+    click.echo(f"\n    Tracks needing attention in '{p.name}':")
+    for label, tracks in attention.items():
+        click.echo(f"    [{label}] ({len(tracks)})")
+        for t in tracks:
+            click.echo(_fmt(t))
 
 
 @click.command()
@@ -128,6 +161,16 @@ def _playlist_summary(p: Playlist) -> str:
     default=False,
     help="List playlists without fetching tracks or exporting.",
 )
+@click.option(
+    "--verbose",
+    is_flag=True,
+    default=False,
+    help=(
+        "After each playlist summary, list tracks that need attention: "
+        "not found on Tidal, unavailable in your region, "
+        "low-confidence search matches, and tracks unavailable on Spotify."
+    ),
+)
 def main(
     config_path: str,
     client_id: str | None,
@@ -142,6 +185,7 @@ def main(
     connect_tidal: bool,
     owned_only: bool,
     list_only: bool,
+    verbose: bool,
 ) -> None:
     """Fetch Spotify playlists and export them.
 
@@ -226,6 +270,8 @@ def main(
 
         for p in playlists:
             click.echo(_playlist_summary(p))
+            if verbose:
+                _verbose_attention(p)
 
     exporter = EXPORTERS[export_format]
     exporter.export(playlists, output_dir)
