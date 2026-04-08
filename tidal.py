@@ -107,7 +107,7 @@ _cache_lock = threading.Lock()
 
 MatchResult = tuple[str | None, str | None, bool | None, str | None, str | None, str | None]  # (tidal_id, method, available, tidal_isrc, tidal_name, name_match)
 
-_MIX_RE = re.compile(r'\([^)]*\bmix\b[^)]*\)', re.IGNORECASE)
+_MIX_RE = re.compile(r'\b(?:re)?mix\b', re.IGNORECASE)
 
 
 def _classify_name_match(spotify_name: str, tidal_name: str) -> str:
