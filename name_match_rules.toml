@@ -37,6 +37,5 @@ mode    = "asymmetric"
 key     = "remaster"
 label   = "remaster mismatch"
 summary = "remaster"
-# Requires a 4-digit year prefix so bare "(Remaster)" falls through to suffix stripping
-pattern = '\b\d{4}\s+remaster(?:ed)?\b'
+pattern = '\b(?:\d{4}\s+)?remaster(?:ed)?\b'
 mode    = "any"
