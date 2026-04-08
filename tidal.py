@@ -1,6 +1,7 @@
 import contextlib
 import json
 import logging
+import re
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -104,7 +105,41 @@ DEFAULT_MATCH_WORKERS = 8
 _match_cache: dict[str, tuple[str | None, str | None, bool | None]] = {}
 _cache_lock = threading.Lock()
 
-MatchResult = tuple[str | None, str | None, bool | None, str | None]  # (tidal_id, method, available, tidal_isrc)
+MatchResult = tuple[str | None, str | None, bool | None, str | None, str | None]  # (tidal_id, method, available, tidal_isrc, name_match)
+
+_MIX_RE = re.compile(r'\([^)]*\bmix\b[^)]*\)', re.IGNORECASE)
+
+
+def _classify_name_match(spotify_name: str, tidal_name: str) -> str:
+    """Classify the name similarity between a Spotify and Tidal track name.
+
+    Returns one of: "exact", "mix_mismatch", "version_mismatch".
+    Falls back to "search" (unclassified) when bases differ.
+    """
+    sp = spotify_name.strip().lower()
+    td = tidal_name.strip().lower()
+
+    if sp == td:
+        return "exact"
+
+    # Mix check first — "(Moodymann Mix)", "(Radio Mix)" etc.
+    if _MIX_RE.search(sp) or _MIX_RE.search(td):
+        return "mix_mismatch"
+
+    # Strip all trailing parenthetical/bracket groups and " - <suffix>" iteratively
+    def strip_suffixes(s: str) -> str:
+        prev = None
+        while prev != s:
+            prev = s
+            s = re.sub(r'\s*-\s+\S.*$', '', s)                    # " - 2018 Remaster"
+            s = re.sub(r'\s*[\(\[][^\)\]]+[\)\]]\s*$', '', s)     # trailing (...) or [...]
+            s = s.strip()
+        return s
+
+    if strip_suffixes(sp) == strip_suffixes(td):
+        return "version_mismatch"
+
+    return "search"  # base names differ — fuzzy, classified later
 
 
 def _cache_key(track: Track) -> str:
@@ -141,7 +176,7 @@ def _do_match(session: tidalapi.Session, track: Track) -> MatchResult:
             if hits:
                 available = [t for t in hits if getattr(t, "available", True)]
                 best = available[0] if available else hits[0]
-                return str(best.id), "isrc", bool(getattr(best, "available", True)), getattr(best, "isrc", None)
+                return str(best.id), "isrc", bool(getattr(best, "available", True)), getattr(best, "isrc", None), None
         except Exception:
             pass
 
@@ -153,11 +188,12 @@ def _do_match(session: tidalapi.Session, track: Track) -> MatchResult:
             results = session.search(query, models=[tidalapi.Track], limit=1)
             hits = results.get("tracks", [])
             if hits:
-                return str(hits[0].id), "search", bool(getattr(hits[0], "available", True)), getattr(hits[0], "isrc", None)
+                name_match = _classify_name_match(track.name, hits[0].name)
+                return str(hits[0].id), "search", bool(getattr(hits[0], "available", True)), getattr(hits[0], "isrc", None), name_match
         except Exception:
             pass
 
-    return None, "not_found", None, None
+    return None, "not_found", None, None, None
 
 
 def match_playlists(
@@ -223,7 +259,7 @@ def match_playlists(
             try:
                 _, result = future.result()
             except Exception:
-                result = (None, "not_found", None, None)
+                result = (None, "not_found", None, None, None)
                 with _cache_lock:
                     _match_cache[key] = result
             _apply_result(key_to_tracks[key], result)
@@ -233,9 +269,10 @@ def match_playlists(
 
 
 def _apply_result(tracks: list[Track], result: MatchResult) -> None:
-    tidal_id, method, available, tidal_isrc = result
+    tidal_id, method, available, tidal_isrc, name_match = result
     for track in tracks:
         track.tidal_id = tidal_id
         track.tidal_match_method = method
         track.tidal_is_available = available
         track.tidal_isrc = tidal_isrc
+        track.tidal_name_match = name_match

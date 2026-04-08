@@ -26,6 +26,11 @@ class Track:
     tidal_is_available: bool | None = None
     # ISRC returned by Tidal for the matched track — compare to `isrc` to verify search matches
     tidal_isrc: str | None = None
+    # Name-comparison verdict for search-matched tracks (None for isrc/not_found):
+    # "exact"            — track names match exactly (case-insensitive)
+    # "version_mismatch" — same base name, differs only by parenthetical/remaster suffix
+    # "mix_mismatch"     — one or both names contain a mix indicator
+    tidal_name_match: str | None = None
 
 
 @dataclass

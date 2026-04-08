@@ -11,15 +11,27 @@ def _playlist_summary(p: Playlist) -> str:
     tracks = p.tracks
     total = len(tracks)
     spotify_avail = sum(1 for t in tracks if t.is_available)
-    isrc      = sum(1 for t in tracks if t.tidal_match_method == "isrc")
-    search    = sum(1 for t in tracks if t.tidal_match_method == "search")
-    unavail   = sum(1 for t in tracks if t.tidal_id and not t.tidal_is_available)
-    not_found = sum(1 for t in tracks if t.tidal_match_method == "not_found")
-    tidal_avail = isrc + search - unavail
+    isrc          = sum(1 for t in tracks if t.tidal_match_method == "isrc")
+    search_exact  = sum(1 for t in tracks if t.tidal_name_match == "exact")
+    search_ver    = sum(1 for t in tracks if t.tidal_name_match == "version_mismatch")
+    search_mix    = sum(1 for t in tracks if t.tidal_name_match == "mix_mismatch")
+    search_other  = sum(1 for t in tracks if t.tidal_match_method == "search" and t.tidal_name_match not in ("exact", "version_mismatch", "mix_mismatch"))
+    unavail       = sum(1 for t in tracks if t.tidal_id and not t.tidal_is_available)
+    not_found     = sum(1 for t in tracks if t.tidal_match_method == "not_found")
+    tidal_avail   = isrc + search_exact + search_ver + search_mix + search_other - unavail
+
+    search_parts = (
+        ([f"{search_exact} exact"]       if search_exact  else [])
+        + ([f"{search_ver} version"]     if search_ver    else [])
+        + ([f"{search_mix} mix"]         if search_mix    else [])
+        + ([f"{search_other} unverified"] if search_other else [])
+    )
+    search_str = f", search: {', '.join(search_parts)}" if search_parts else ""
+
     return (
         f"  {p.name}: {total} tracks | "
         f"Spotify: {spotify_avail} avail | "
-        f"Tidal: {tidal_avail} avail ({isrc} ISRC, {search} search)"
+        f"Tidal: {tidal_avail} avail ({isrc} ISRC{search_str})"
         + (f", {unavail} unavail" if unavail else "")
         + (f", {not_found} not found" if not_found else "")
     )
@@ -40,8 +52,14 @@ def _verbose_attention(p: Playlist) -> None:
         "On Tidal but unavailable in your region": [
             t for t in p.tracks if t.tidal_id and not t.tidal_is_available
         ],
-        "Matched via search only (verify)": [
-            t for t in p.tracks if t.tidal_match_method == "search"
+        "Search: mix mismatch (likely wrong track)": [
+            t for t in p.tracks if t.tidal_name_match == "mix_mismatch"
+        ],
+        "Search: version mismatch (different edition)": [
+            t for t in p.tracks if t.tidal_name_match == "version_mismatch"
+        ],
+        "Search: unverified (fuzzy name match)": [
+            t for t in p.tracks if t.tidal_match_method == "search" and t.tidal_name_match not in ("exact", "version_mismatch", "mix_mismatch")
         ],
         "Unavailable on Spotify": [
             t for t in p.tracks if not t.is_available
