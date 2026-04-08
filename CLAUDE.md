@@ -5,6 +5,11 @@
 authenticated user and exports them. The long-term goal is to migrate playlists to Tidal.
 Tidal functionality is **not yet implemented**.
 
+## Committing
+- Commit after every logical unit of work — do not let changes pile up across multiple features
+- Group related changes into one commit; separate unrelated changes into separate commits
+- Write descriptive commit messages that explain what changed and why
+
 ## Allowed without asking
 - Editing any source file in this repo
 - Running `uv sync`, `uv run`, and `uv add`
