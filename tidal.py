@@ -50,18 +50,18 @@ _REQUEST_TIMEOUT = 10  # seconds per Tidal API call
 
 
 def _patch_request_timeout(session: tidalapi.Session, timeout: int = _REQUEST_TIMEOUT) -> None:
-    """Monkey-patch tidalapi's internal requests.Session to enforce a timeout.
+    """Patch tidalapi's underlying requests.Session to enforce a per-call timeout.
 
-    tidalapi doesn't expose a timeout setting, so without this a single slow
-    API call can block the thread pool indefinitely.
+    tidalapi calls self.session.request_session.request(...) for every HTTP
+    request but never passes a timeout, so a single slow call blocks forever.
     """
-    original = session.request.session.request
+    original = session.request_session.request
 
     def _with_timeout(*args, **kwargs):
         kwargs.setdefault("timeout", timeout)
         return original(*args, **kwargs)
 
-    session.request.session.request = _with_timeout
+    session.request_session.request = _with_timeout
 
 
 def create_client() -> tidalapi.Session:
