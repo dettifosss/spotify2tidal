@@ -29,8 +29,9 @@ def _verbose_attention(p: Playlist) -> None:
     """Print tracks needing attention for a playlist, grouped by issue."""
     def _fmt(t) -> str:
         artists = ", ".join(t.artists) if t.artists else "Unknown artist"
-        isrc = (t.isrc or "").ljust(12)
-        return f"      {isrc}  {t.name} — {artists}"
+        sp_isrc = (t.isrc or "").ljust(12)
+        td_isrc = (t.tidal_isrc or "").ljust(12)
+        return f"      {sp_isrc}  {td_isrc}  {t.name} — {artists}"
 
     groups = {
         "Not found on Tidal": [
