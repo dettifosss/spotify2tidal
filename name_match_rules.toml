@@ -27,6 +27,14 @@ pattern = '\bradio\s+(?:edit|version)\b'
 mode    = "asymmetric"
 
 [[rules]]
+key     = "feat_variant"
+label   = "featured artist variant (likely correct)"
+summary = "feat variant"
+# Matches feat. / feat / featuring / ft. in either name
+pattern = '\bfeat(?:uring)?\.?|\bft\.'
+mode    = "any"
+
+[[rules]]
 key     = "version_mismatch"
 label   = "version mismatch (different edition)"
 summary = "version"
