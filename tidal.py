@@ -137,7 +137,7 @@ def _do_match(session: tidalapi.Session, track: Track) -> MatchResult:
     #    Prefer available tracks; keep unavailable as fallback so the ID is recorded.
     if track.isrc:
         try:
-            hits = session.get_tracks_by_isrc(track.isrc)
+            hits = session.get_tracks_by_isrc(track.isrc.upper())
             if hits:
                 available = [t for t in hits if getattr(t, "available", True)]
                 best = available[0] if available else hits[0]
