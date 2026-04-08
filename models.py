@@ -24,9 +24,10 @@ class Track:
     tidal_match_method: str | None = None
     # True/False = available or not in your Tidal region; None = not yet matched
     tidal_is_available: bool | None = None
-    # ISRC and name returned by Tidal for the matched track — compare to verify search quality
+    # ISRC, name and artist returned by Tidal for the matched track — compare to verify search quality
     tidal_isrc: str | None = None
     tidal_name: str | None = None
+    tidal_artist: str | None = None
     # Name-comparison verdict for search-matched tracks (None for isrc/not_found):
     # "exact"            — track names match exactly (case-insensitive)
     # "version_mismatch" — same base name, differs only by parenthetical/remaster suffix

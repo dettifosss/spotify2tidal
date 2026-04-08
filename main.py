@@ -40,11 +40,12 @@ def _playlist_summary(p: Playlist) -> str:
 def _verbose_attention(p: Playlist) -> None:
     """Print tracks needing attention for a playlist, grouped by issue."""
     def _fmt(t) -> str:
-        artists = ", ".join(t.artists) if t.artists else "Unknown artist"
+        sp_artist = ", ".join(t.artists) if t.artists else "Unknown artist"
         sp_isrc = (t.isrc or "").ljust(12)
         td_isrc = (t.tidal_isrc or "").ljust(12)
-        sp_line = f"      SP  {sp_isrc}  {t.name} — {artists}"
-        td_line = f"      TD  {td_isrc}  {t.tidal_name or '—'}"
+        td_artist = t.tidal_artist or "Unknown artist"
+        sp_line = f"      SP  {sp_isrc}  {sp_artist} - {t.name}"
+        td_line = f"      TD  {td_isrc}  {td_artist} - {t.tidal_name or '—'}"
         return f"{sp_line}\n{td_line}"
 
     known_keys = frozenset(r.key for r in NAME_MATCH_RULES) | {"exact"}
