@@ -1,0 +1,31 @@
+# Copy this file to config.toml and fill in your values.
+# config.toml is gitignored — never commit it.
+
+[spotify]
+client_id     = "your_spotify_client_id"
+client_secret = "your_spotify_client_secret"
+redirect_uri  = "http://127.0.0.1:8888/callback"
+
+[defaults]
+market     = "IS"          # ISO 3166-1 alpha-2 country code for track availability
+output_dir = "output"      # where exported files are written
+format     = "csv"         # export format (only "csv" for now)
+
+# ---------------------------------------------------------------------------
+# Per-user overrides (optional — add one [[users]] block per account)
+#
+# Useful when fetching private playlists for multiple users: each user can
+# have their own Spotify developer app credentials so you can OAuth as them.
+# If spotify_client_id / spotify_client_secret are omitted, the global
+# [spotify] credentials above are used instead.
+# ---------------------------------------------------------------------------
+
+# [[users]]
+# name                  = "alice"
+# spotify_id            = "alice_spotify_user_id"
+# spotify_client_id     = "alice_app_client_id"
+# spotify_client_secret = "alice_app_client_secret"
+
+# [[users]]
+# name                  = "bob"
+# spotify_id            = "bob_spotify_user_id"

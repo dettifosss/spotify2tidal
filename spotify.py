@@ -99,12 +99,25 @@ def fetch_playlist_tracks(
     return tracks
 
 
-def fetch_user_playlists(sp: spotipy.Spotify) -> list[Playlist]:
-    me = sp.me()
-    user_id: str = me["id"]
+def fetch_user_playlists(
+    sp: spotipy.Spotify,
+    target_user_id: str | None = None,
+) -> list[Playlist]:
+    """Fetch playlists for a Spotify user.
+
+    If target_user_id is None, fetches the authenticated user's playlists
+    (private + public).  If a user ID is provided, fetches that user's
+    publicly visible playlists only.
+    """
+    if target_user_id is None:
+        me = sp.me()
+        owner_key: str = me["id"]
+        results = sp.current_user_playlists()
+    else:
+        owner_key = target_user_id
+        results = sp.user_playlists(target_user_id)
 
     playlists: list[Playlist] = []
-    results = sp.current_user_playlists()
     while results:
         for item in results.get("items") or []:
             if item is None:
@@ -116,9 +129,37 @@ def fetch_user_playlists(sp: spotipy.Spotify) -> list[Playlist]:
                 description=item.get("description") or "",
                 owner_id=owner_id,
                 owner_name=item["owner"].get("display_name") or owner_id,
-                is_owned=(owner_id == user_id),
+                is_owned=(owner_id == owner_key),
                 total_tracks=item["tracks"]["total"],
             ))
         results = sp.next(results) if results.get("next") else None
 
     return playlists
+
+
+def fetch_single_playlist(
+    sp: spotipy.Spotify,
+    playlist_id: str,
+    market: str | None = None,
+) -> Playlist:
+    """Fetch a single playlist by ID, including all its tracks."""
+    me = sp.me()
+    my_id: str = me["id"]
+
+    kwargs: dict = {}
+    if market:
+        kwargs["market"] = market
+    item = sp.playlist(playlist_id, **kwargs)
+
+    owner_id: str = item["owner"]["id"]
+    playlist = Playlist(
+        id=item["id"],
+        name=item["name"],
+        description=item.get("description") or "",
+        owner_id=owner_id,
+        owner_name=item["owner"].get("display_name") or owner_id,
+        is_owned=(owner_id == my_id),
+        total_tracks=item["tracks"]["total"],
+    )
+    playlist.tracks = fetch_playlist_tracks(sp, playlist_id, market=market)
+    return playlist

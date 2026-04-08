@@ -13,6 +13,12 @@ wheels/
 .cache
 .cache-*
 
+# Tidal OAuth token cache
+.tidal_cache.json
+
+# Config file (contains secrets — copy from config.toml.example)
+config.toml
+
 # Claude Code internal directory
 .claude/
 
