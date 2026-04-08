@@ -109,12 +109,19 @@ MatchResult = tuple[str | None, str | None, bool | None, str | None, str | None,
 
 _MIX_RE = re.compile(r'\b(?:re)?mix\b', re.IGNORECASE)
 
+# Keywords that signal a specific performance/recording variant.
+# Checked asymmetrically: fires only when one name has the keyword and the other doesn't,
+# so "Live and Let Die" vs "Live and Let Die (Remaster)" doesn't false-positive.
+_VERSION_RE = re.compile(
+    r'\b(?:live|demo|acoustic|outtake|concert|session|instrumental|reprise|bonus|extended|rehearsal)\b',
+    re.IGNORECASE,
+)
+
 
 def _classify_name_match(spotify_name: str, tidal_name: str) -> str:
     """Classify the name similarity between a Spotify and Tidal track name.
 
-    Returns one of: "exact", "mix_mismatch", "version_mismatch".
-    Falls back to "search" (unclassified) when bases differ.
+    Returns one of: "exact", "mix_mismatch", "version_mismatch", "search".
     """
     sp = spotify_name.strip().lower()
     td = tidal_name.strip().lower()
@@ -122,9 +129,13 @@ def _classify_name_match(spotify_name: str, tidal_name: str) -> str:
     if sp == td:
         return "exact"
 
-    # Mix check first — "(Moodymann Mix)", "(Radio Mix)" etc.
+    # Mix check — "(Moodymann Mix)", "Remix" etc.
     if _MIX_RE.search(sp) or _MIX_RE.search(td):
         return "mix_mismatch"
+
+    # Version keyword check — asymmetric: only fires when one name has it and the other doesn't
+    if bool(_VERSION_RE.search(sp)) != bool(_VERSION_RE.search(td)):
+        return "version_mismatch"
 
     # Strip all trailing parenthetical/bracket groups and " - <suffix>" iteratively
     def strip_suffixes(s: str) -> str:
