@@ -1,0 +1,20 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Spotipy OAuth token cache
+.cache
+.cache-*
+
+# Claude Code internal directory
+.claude/
+
+# Exported output
+output/

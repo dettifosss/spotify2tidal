@@ -1,0 +1,57 @@
+import csv
+import os
+import re
+from abc import ABC, abstractmethod
+
+from models import Playlist
+
+
+def _safe_filename(name: str) -> str:
+    """Replace characters that are invalid in filenames with underscores."""
+    return re.sub(r'[\\/:*?"<>|]', "_", name).strip()
+
+
+class BaseExporter(ABC):
+    @abstractmethod
+    def export(self, playlists: list[Playlist], output_dir: str) -> None:
+        """Export playlists to output_dir."""
+
+
+class CSVExporter(BaseExporter):
+    FIELDS = [
+        "name",
+        "artists",
+        "album",
+        "isrc",
+        "duration_ms",
+        "added_at",
+        "spotify_id",
+        "is_available",
+        "is_local",
+    ]
+
+    def export(self, playlists: list[Playlist], output_dir: str) -> None:
+        os.makedirs(output_dir, exist_ok=True)
+        for playlist in playlists:
+            filename = _safe_filename(playlist.name) + ".csv"
+            filepath = os.path.join(output_dir, filename)
+            with open(filepath, "w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=self.FIELDS)
+                writer.writeheader()
+                for track in playlist.tracks:
+                    writer.writerow({
+                        "name": track.name,
+                        "artists": "; ".join(track.artists),
+                        "album": track.album,
+                        "isrc": track.isrc or "",
+                        "duration_ms": track.duration_ms,
+                        "added_at": track.added_at or "",
+                        "spotify_id": track.spotify_id or "",
+                        "is_available": track.is_available,
+                        "is_local": track.is_local,
+                    })
+
+
+EXPORTERS: dict[str, BaseExporter] = {
+    "csv": CSVExporter(),
+}
