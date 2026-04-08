@@ -32,6 +32,7 @@ class Track:
     # "version_mismatch" — same base name, differs only by parenthetical/remaster suffix
     # "mix_mismatch"     — one or both names contain a mix/remix indicator
     # "radio_edit"       — one name contains "Radio Edit" / "Radio Version", other doesn't
+    # "remaster"         — either name contains a "<year> Remaster" pattern
     tidal_name_match: str | None = None
 
 

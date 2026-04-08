@@ -40,6 +40,13 @@ NAME_MATCH_RULES: list[NameMatchRule] = [
         ),
         mode="asymmetric",
     ),
+    NameMatchRule(
+        key="remaster",
+        label="remaster mismatch",
+        summary="remaster",
+        pattern=re.compile(r'\b\d{4}\s+remaster(?:ed)?\b', re.IGNORECASE),
+        mode="any",
+    ),
 ]
 
 
