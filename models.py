@@ -30,7 +30,8 @@ class Track:
     # Name-comparison verdict for search-matched tracks (None for isrc/not_found):
     # "exact"            — track names match exactly (case-insensitive)
     # "version_mismatch" — same base name, differs only by parenthetical/remaster suffix
-    # "mix_mismatch"     — one or both names contain a mix indicator
+    # "mix_mismatch"     — one or both names contain a mix/remix indicator
+    # "radio_edit"       — one name contains "Radio Edit" / "Radio Version", other doesn't
     tidal_name_match: str | None = None
 
 

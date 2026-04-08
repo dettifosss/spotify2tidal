@@ -109,6 +109,10 @@ MatchResult = tuple[str | None, str | None, bool | None, str | None, str | None,
 
 _MIX_RE = re.compile(r'\b(?:re)?mix\b', re.IGNORECASE)
 
+# "Radio Edit" / "Radio Version" — checked asymmetrically.
+# Uses the phrase form so bare "Radio" in song titles (e.g. "Radio Gaga") doesn't fire.
+_RADIO_EDIT_RE = re.compile(r'\bradio\s+(?:edit|version)\b', re.IGNORECASE)
+
 # Keywords that signal a specific performance/recording variant.
 # Checked asymmetrically: fires only when one name has the keyword and the other doesn't,
 # so "Live and Let Die" vs "Live and Let Die (Remaster)" doesn't false-positive.
@@ -132,6 +136,10 @@ def _classify_name_match(spotify_name: str, tidal_name: str) -> str:
     # Mix check — "(Moodymann Mix)", "Remix" etc.
     if _MIX_RE.search(sp) or _MIX_RE.search(td):
         return "mix_mismatch"
+
+    # Radio edit check — asymmetric
+    if bool(_RADIO_EDIT_RE.search(sp)) != bool(_RADIO_EDIT_RE.search(td)):
+        return "radio_edit"
 
     # Version keyword check — asymmetric: only fires when one name has it and the other doesn't
     if bool(_VERSION_RE.search(sp)) != bool(_VERSION_RE.search(td)):
