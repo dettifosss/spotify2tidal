@@ -8,6 +8,7 @@ _RULES_PATH = Path(__file__).parent / "name_match_rules.toml"
 
 @dataclass(frozen=True)
 class NameMatchRule:
+    order: int          # evaluation priority; lower numbers run first
     key: str            # value stored in tidal_name_match
     label: str          # verbose group label (appended to "Search: ")
     summary: str        # short form used in the playlist summary line
@@ -19,8 +20,9 @@ class NameMatchRule:
 def _load_rules() -> list[NameMatchRule]:
     with open(_RULES_PATH, "rb") as f:
         data = tomllib.load(f)
-    return [
+    rules = [
         NameMatchRule(
+            order=r["order"],
             key=r["key"],
             label=r["label"],
             summary=r["summary"],
@@ -29,6 +31,7 @@ def _load_rules() -> list[NameMatchRule]:
         )
         for r in data["rules"]
     ]
+    return sorted(rules, key=lambda r: r.order)
 
 
 NAME_MATCH_RULES: list[NameMatchRule] = _load_rules()

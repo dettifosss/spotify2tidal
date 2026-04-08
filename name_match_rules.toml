@@ -1,9 +1,10 @@
 # Name match rules for comparing Spotify and Tidal track names.
-# Rules are evaluated in order — first match wins.
+# Rules are evaluated in ascending order — first match wins.
 # Adding a new rule here is all that's needed; matching.py, main.py and the
 # summary/verbose output all derive their behaviour from this file.
 #
 # Fields:
+#   order   — evaluation priority; lower numbers run first
 #   key     — value stored in tidal_name_match; used in CSV and code comparisons
 #   label   — verbose output group heading (prefixed with "Search: ")
 #   summary — short label used in the per-playlist summary line
@@ -12,22 +13,24 @@
 #             "asymmetric": fires if EXACTLY ONE name matches the pattern
 
 [[rules]]
-key     = "mix_mismatch"
-label   = "mix mismatch (likely wrong track)"
-summary = "mix"
-# Negative lookbehind excludes "Original Mix" — that case is handled by original_mix below
-pattern = '(?<!original )\b(?:re)?mix\b'
-mode    = "any"
-
-[[rules]]
+order   = 10
 key     = "original_mix"
 label   = "original mix (likely correct)"
 summary = "original mix"
-# Fires when exactly one name has "Original Mix" and the other is clean
+# Must run before mix_mismatch (order 20) so "Original Mix" is caught first
 pattern = '\boriginal\s+mix\b'
 mode    = "asymmetric"
 
 [[rules]]
+order   = 20
+key     = "mix_mismatch"
+label   = "mix mismatch (likely wrong track)"
+summary = "mix"
+pattern = '\b(?:re)?mix\b'
+mode    = "any"
+
+[[rules]]
+order   = 30
 key     = "radio_edit"
 label   = "radio edit mismatch"
 summary = "radio edit"
@@ -36,6 +39,7 @@ pattern = '\bradio\s+(?:edit|version)\b'
 mode    = "asymmetric"
 
 [[rules]]
+order   = 40
 key     = "feat_variant"
 label   = "featured artist variant (likely correct)"
 summary = "feat variant"
@@ -44,6 +48,7 @@ pattern = '\bfeat(?:uring)?\.?|\bft\.'
 mode    = "any"
 
 [[rules]]
+order   = 50
 key     = "version_mismatch"
 label   = "version mismatch (different edition)"
 summary = "version"
@@ -51,6 +56,7 @@ pattern = '\b(?:live|demo|acoustic|outtake|concert|session|instrumental|reprise|
 mode    = "asymmetric"
 
 [[rules]]
+order   = 60
 key     = "remaster"
 label   = "remaster mismatch"
 summary = "remaster"
