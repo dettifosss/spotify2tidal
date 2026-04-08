@@ -46,6 +46,24 @@ def _load_session(session: tidalapi.Session) -> bool:
         return False
 
 
+_REQUEST_TIMEOUT = 10  # seconds per Tidal API call
+
+
+def _patch_request_timeout(session: tidalapi.Session, timeout: int = _REQUEST_TIMEOUT) -> None:
+    """Monkey-patch tidalapi's internal requests.Session to enforce a timeout.
+
+    tidalapi doesn't expose a timeout setting, so without this a single slow
+    API call can block the thread pool indefinitely.
+    """
+    original = session.request.session.request
+
+    def _with_timeout(*args, **kwargs):
+        kwargs.setdefault("timeout", timeout)
+        return original(*args, **kwargs)
+
+    session.request.session.request = _with_timeout
+
+
 def create_client() -> tidalapi.Session:
     """Return an authenticated Tidal session using tidalapi's built-in credentials.
 
@@ -57,6 +75,7 @@ def create_client() -> tidalapi.Session:
     session = tidalapi.Session()
 
     if _load_session(session):
+        _patch_request_timeout(session)
         return session
 
     # First login (or expired/missing cache) — device code flow
@@ -66,6 +85,7 @@ def create_client() -> tidalapi.Session:
     future.result()  # blocks until the user completes auth
 
     _save_session(session)
+    _patch_request_timeout(session)
     return session
 
 
