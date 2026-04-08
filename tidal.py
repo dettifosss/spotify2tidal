@@ -105,7 +105,7 @@ DEFAULT_MATCH_WORKERS = 8
 _match_cache: dict[str, tuple[str | None, str | None, bool | None]] = {}
 _cache_lock = threading.Lock()
 
-MatchResult = tuple[str | None, str | None, bool | None, str | None, str | None]  # (tidal_id, method, available, tidal_isrc, name_match)
+MatchResult = tuple[str | None, str | None, bool | None, str | None, str | None, str | None]  # (tidal_id, method, available, tidal_isrc, tidal_name, name_match)
 
 _MIX_RE = re.compile(r'\([^)]*\bmix\b[^)]*\)', re.IGNORECASE)
 
@@ -176,7 +176,7 @@ def _do_match(session: tidalapi.Session, track: Track) -> MatchResult:
             if hits:
                 available = [t for t in hits if getattr(t, "available", True)]
                 best = available[0] if available else hits[0]
-                return str(best.id), "isrc", bool(getattr(best, "available", True)), getattr(best, "isrc", None), None
+                return str(best.id), "isrc", bool(getattr(best, "available", True)), getattr(best, "isrc", None), getattr(best, "name", None), None
         except Exception:
             pass
 
@@ -189,11 +189,11 @@ def _do_match(session: tidalapi.Session, track: Track) -> MatchResult:
             hits = results.get("tracks", [])
             if hits:
                 name_match = _classify_name_match(track.name, hits[0].name)
-                return str(hits[0].id), "search", bool(getattr(hits[0], "available", True)), getattr(hits[0], "isrc", None), name_match
+                return str(hits[0].id), "search", bool(getattr(hits[0], "available", True)), getattr(hits[0], "isrc", None), getattr(hits[0], "name", None), name_match
         except Exception:
             pass
 
-    return None, "not_found", None, None, None
+    return None, "not_found", None, None, None, None
 
 
 def match_playlists(
@@ -259,7 +259,7 @@ def match_playlists(
             try:
                 _, result = future.result()
             except Exception:
-                result = (None, "not_found", None, None, None)
+                result = (None, "not_found", None, None, None, None)
                 with _cache_lock:
                     _match_cache[key] = result
             _apply_result(key_to_tracks[key], result)
@@ -269,10 +269,11 @@ def match_playlists(
 
 
 def _apply_result(tracks: list[Track], result: MatchResult) -> None:
-    tidal_id, method, available, tidal_isrc, name_match = result
+    tidal_id, method, available, tidal_isrc, tidal_name, name_match = result
     for track in tracks:
         track.tidal_id = tidal_id
         track.tidal_match_method = method
         track.tidal_is_available = available
         track.tidal_isrc = tidal_isrc
+        track.tidal_name = tidal_name
         track.tidal_name_match = name_match

@@ -43,7 +43,9 @@ def _verbose_attention(p: Playlist) -> None:
         artists = ", ".join(t.artists) if t.artists else "Unknown artist"
         sp_isrc = (t.isrc or "").ljust(12)
         td_isrc = (t.tidal_isrc or "").ljust(12)
-        return f"      {sp_isrc}  {td_isrc}  {t.name} — {artists}"
+        sp_line = f"      SP  {sp_isrc}  {t.name} — {artists}"
+        td_line = f"      TD  {td_isrc}  {t.tidal_name or '—'}"
+        return f"{sp_line}\n{td_line}"
 
     groups = {
         "Not found on Tidal": [
