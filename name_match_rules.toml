@@ -43,9 +43,11 @@ order   = 40
 key     = "feat_variant"
 label   = "featured artist variant (likely correct)"
 summary = "feat variant"
-# Matches feat. / feat / featuring / ft. in either name
+# mode 'feat' strips feat. references from both names and only fires if the
+# resulting base names match — prevents false positives like "Dig This" vs
+# "Follow This feat. HOCUS POCUS" where the feat artist was the search hit
 pattern = '\bfeat(?:uring)?\.?|\bft\.'
-mode    = "any"
+mode    = "feat"
 
 [[rules]]
 order   = 50

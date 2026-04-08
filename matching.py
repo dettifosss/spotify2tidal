@@ -13,8 +13,10 @@ class NameMatchRule:
     label: str          # verbose group label (appended to "Search: ")
     summary: str        # short form used in the playlist summary line
     pattern: re.Pattern
-    mode: str           # "any": fires if either name matches
-                        # "asymmetric": fires if exactly one name matches
+    mode: str           # "any":        fires if either name matches the pattern
+                        # "asymmetric": fires if exactly one name matches the pattern
+                        # "feat":       strips feat. refs from both names, fires if
+                        #               the stripped bases then match
 
 
 def _load_rules() -> list[NameMatchRule]:
@@ -48,6 +50,15 @@ def _strip_suffixes(s: str) -> str:
     return s
 
 
+def _strip_feat(s: str) -> str:
+    """Remove featured artist references from a name string."""
+    # Parenthetical form: "(feat. X)" / "[featuring X]" etc.
+    s = re.sub(r'\s*[\(\[]\s*(?:feat(?:uring)?\.?|ft\.)\s+[^\)\]]+[\)\]]', '', s, flags=re.IGNORECASE)
+    # Inline form at end: "Song feat. X" / "Song, feat. X"
+    s = re.sub(r'\s*,?\s*\b(?:feat(?:uring)?\.?|ft\.)\s+.+$', '', s, flags=re.IGNORECASE)
+    return s.strip()
+
+
 def classify_name_match(name_a: str, name_b: str) -> str:
     """Classify the similarity between two track names.
 
@@ -71,6 +82,12 @@ def classify_name_match(name_a: str, name_b: str) -> str:
                 return rule.key
             case "asymmetric" if a_hit != b_hit:
                 return rule.key
+            case "feat":
+                a_norm = _strip_feat(a)
+                b_norm = _strip_feat(b)
+                # Only fire if something was stripped AND the bases now match
+                if (a_norm != a or b_norm != b) and _strip_suffixes(a_norm) == _strip_suffixes(b_norm):
+                    return rule.key
 
     # Structural fallback: strip remaster/year/other suffixes and compare bases
     if _strip_suffixes(a) == _strip_suffixes(b):
