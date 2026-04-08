@@ -4,6 +4,7 @@ import logging
 import re
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -107,58 +108,80 @@ _cache_lock = threading.Lock()
 
 MatchResult = tuple[str | None, str | None, bool | None, str | None, str | None, str | None]  # (tidal_id, method, available, tidal_isrc, tidal_name, name_match)
 
-_MIX_RE = re.compile(r'\b(?:re)?mix\b', re.IGNORECASE)
 
-# "Radio Edit" / "Radio Version" — checked asymmetrically.
-# Uses the phrase form so bare "Radio" in song titles (e.g. "Radio Gaga") doesn't fire.
-_RADIO_EDIT_RE = re.compile(r'\bradio\s+(?:edit|version)\b', re.IGNORECASE)
+@dataclass(frozen=True)
+class NameMatchRule:
+    key: str            # value stored in tidal_name_match
+    label: str          # verbose group label (appended to "Search: ")
+    summary: str        # short form used in the playlist summary line
+    pattern: re.Pattern
+    mode: str           # "any": fires if either name matches
+                        # "asymmetric": fires if exactly one name matches
 
-# Keywords that signal a specific performance/recording variant.
-# Checked asymmetrically: fires only when one name has the keyword and the other doesn't,
-# so "Live and Let Die" vs "Live and Let Die (Remaster)" doesn't false-positive.
-_VERSION_RE = re.compile(
-    r'\b(?:live|demo|acoustic|outtake|concert|session|instrumental|reprise|bonus|extended|rehearsal)\b',
-    re.IGNORECASE,
-)
+
+# Rules are checked in order; first match wins.
+# To add a new classification: append a NameMatchRule here — nothing else needs changing.
+NAME_MATCH_RULES: list[NameMatchRule] = [
+    NameMatchRule(
+        key="mix_mismatch",
+        label="mix mismatch (likely wrong track)",
+        summary="mix",
+        pattern=re.compile(r'\b(?:re)?mix\b', re.IGNORECASE),
+        mode="any",
+    ),
+    NameMatchRule(
+        key="radio_edit",
+        label="radio edit mismatch",
+        summary="radio edit",
+        # Phrase form avoids false positives on titles like "Radio Gaga"
+        pattern=re.compile(r'\bradio\s+(?:edit|version)\b', re.IGNORECASE),
+        mode="asymmetric",
+    ),
+    NameMatchRule(
+        key="version_mismatch",
+        label="version mismatch (different edition)",
+        summary="version",
+        pattern=re.compile(
+            r'\b(?:live|demo|acoustic|outtake|concert|session|instrumental|reprise|bonus|extended|rehearsal)\b',
+            re.IGNORECASE,
+        ),
+        mode="asymmetric",
+    ),
+]
+
+def _strip_suffixes(s: str) -> str:
+    """Strip trailing parenthetical/bracket groups and ' - <suffix>' iteratively."""
+    prev = None
+    while prev != s:
+        prev = s
+        s = re.sub(r'\s*-\s+\S.*$', '', s)                # " - 2018 Remaster"
+        s = re.sub(r'\s*[\(\[][^\)\]]+[\)\]]\s*$', '', s)  # trailing (...) or [...]
+        s = s.strip()
+    return s
 
 
 def _classify_name_match(spotify_name: str, tidal_name: str) -> str:
-    """Classify the name similarity between a Spotify and Tidal track name.
-
-    Returns one of: "exact", "mix_mismatch", "version_mismatch", "search".
-    """
+    """Classify the name similarity between a Spotify and Tidal track name."""
     sp = spotify_name.strip().lower()
     td = tidal_name.strip().lower()
 
     if sp == td:
         return "exact"
 
-    # Mix check — "(Moodymann Mix)", "Remix" etc.
-    if _MIX_RE.search(sp) or _MIX_RE.search(td):
-        return "mix_mismatch"
+    for rule in NAME_MATCH_RULES:
+        sp_hit = bool(rule.pattern.search(sp))
+        td_hit = bool(rule.pattern.search(td))
+        match rule.mode:
+            case "any" if sp_hit or td_hit:
+                return rule.key
+            case "asymmetric" if sp_hit != td_hit:
+                return rule.key
 
-    # Radio edit check — asymmetric
-    if bool(_RADIO_EDIT_RE.search(sp)) != bool(_RADIO_EDIT_RE.search(td)):
-        return "radio_edit"
-
-    # Version keyword check — asymmetric: only fires when one name has it and the other doesn't
-    if bool(_VERSION_RE.search(sp)) != bool(_VERSION_RE.search(td)):
+    # Structural fallback: strip remaster/year/other suffixes and compare bases
+    if _strip_suffixes(sp) == _strip_suffixes(td):
         return "version_mismatch"
 
-    # Strip all trailing parenthetical/bracket groups and " - <suffix>" iteratively
-    def strip_suffixes(s: str) -> str:
-        prev = None
-        while prev != s:
-            prev = s
-            s = re.sub(r'\s*-\s+\S.*$', '', s)                    # " - 2018 Remaster"
-            s = re.sub(r'\s*[\(\[][^\)\]]+[\)\]]\s*$', '', s)     # trailing (...) or [...]
-            s = s.strip()
-        return s
-
-    if strip_suffixes(sp) == strip_suffixes(td):
-        return "version_mismatch"
-
-    return "search"  # base names differ — fuzzy, classified later
+    return "search"  # base names differ — unclassified
 
 
 def _cache_key(track: Track) -> str:

@@ -4,30 +4,26 @@ import config as cfg_module
 from exporters import EXPORTERS
 from models import Playlist
 from spotify import create_client, fetch_playlist_tracks, fetch_single_playlist, fetch_user_playlists
-from tidal import create_client as create_tidal_client, match_playlists
+from tidal import NAME_MATCH_RULES, create_client as create_tidal_client, match_playlists
 
 
 def _playlist_summary(p: Playlist) -> str:
     tracks = p.tracks
     total = len(tracks)
     spotify_avail = sum(1 for t in tracks if t.is_available)
-    _KNOWN_NAME_MATCHES = ("exact", "version_mismatch", "mix_mismatch", "radio_edit")
+    known_keys    = frozenset(r.key for r in NAME_MATCH_RULES) | {"exact"}
     isrc          = sum(1 for t in tracks if t.tidal_match_method == "isrc")
     search_exact  = sum(1 for t in tracks if t.tidal_name_match == "exact")
-    search_ver    = sum(1 for t in tracks if t.tidal_name_match == "version_mismatch")
-    search_mix    = sum(1 for t in tracks if t.tidal_name_match == "mix_mismatch")
-    search_radio  = sum(1 for t in tracks if t.tidal_name_match == "radio_edit")
-    search_other  = sum(1 for t in tracks if t.tidal_match_method == "search" and t.tidal_name_match not in _KNOWN_NAME_MATCHES)
+    rule_counts   = {r.key: sum(1 for t in tracks if t.tidal_name_match == r.key) for r in NAME_MATCH_RULES}
+    search_other  = sum(1 for t in tracks if t.tidal_match_method == "search" and t.tidal_name_match not in known_keys)
     unavail       = sum(1 for t in tracks if t.tidal_id and not t.tidal_is_available)
     not_found     = sum(1 for t in tracks if t.tidal_match_method == "not_found")
-    tidal_avail   = isrc + search_exact + search_ver + search_mix + search_radio + search_other - unavail
+    tidal_avail   = isrc + search_exact + sum(rule_counts.values()) + search_other - unavail
 
     search_parts = (
-        ([f"{search_exact} exact"]        if search_exact  else [])
-        + ([f"{search_ver} version"]      if search_ver    else [])
-        + ([f"{search_mix} mix"]          if search_mix    else [])
-        + ([f"{search_radio} radio edit"] if search_radio  else [])
-        + ([f"{search_other} unverified"] if search_other  else [])
+        ([f"{search_exact} exact"] if search_exact else [])
+        + [f"{rule_counts[r.key]} {r.summary}" for r in NAME_MATCH_RULES if rule_counts[r.key]]
+        + ([f"{search_other} unverified"] if search_other else [])
     )
     search_str = f", search: {', '.join(search_parts)}" if search_parts else ""
 
@@ -50,6 +46,7 @@ def _verbose_attention(p: Playlist) -> None:
         td_line = f"      TD  {td_isrc}  {t.tidal_name or '—'}"
         return f"{sp_line}\n{td_line}"
 
+    known_keys = frozenset(r.key for r in NAME_MATCH_RULES) | {"exact"}
     groups = {
         "Not found on Tidal": [
             t for t in p.tracks if t.tidal_match_method == "not_found"
@@ -57,17 +54,12 @@ def _verbose_attention(p: Playlist) -> None:
         "On Tidal but unavailable in your region": [
             t for t in p.tracks if t.tidal_id and not t.tidal_is_available
         ],
-        "Search: mix mismatch (likely wrong track)": [
-            t for t in p.tracks if t.tidal_name_match == "mix_mismatch"
-        ],
-        "Search: radio edit mismatch": [
-            t for t in p.tracks if t.tidal_name_match == "radio_edit"
-        ],
-        "Search: version mismatch (different edition)": [
-            t for t in p.tracks if t.tidal_name_match == "version_mismatch"
-        ],
+        **{
+            f"Search: {r.label}": [t for t in p.tracks if t.tidal_name_match == r.key]
+            for r in NAME_MATCH_RULES
+        },
         "Search: unverified (fuzzy name match)": [
-            t for t in p.tracks if t.tidal_match_method == "search" and t.tidal_name_match not in ("exact", "version_mismatch", "mix_mismatch", "radio_edit")
+            t for t in p.tracks if t.tidal_match_method == "search" and t.tidal_name_match not in known_keys
         ],
         "Unavailable on Spotify": [
             t for t in p.tracks if not t.is_available
