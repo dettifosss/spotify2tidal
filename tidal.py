@@ -1,6 +1,6 @@
 import contextlib
-import io
 import json
+import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -119,17 +119,25 @@ def _cache_key(track: Track) -> str:
     return f"search:{track.name.casefold().strip()}|{artist}"
 
 
+@contextlib.contextmanager
+def _silence_tidalapi():
+    """Suppress tidalapi's log.warning('Track X is unavailable') noise."""
+    logger = logging.getLogger("tidalapi")
+    original = logger.level
+    logger.setLevel(logging.ERROR)
+    try:
+        yield
+    finally:
+        logger.setLevel(original)
+
+
 def _do_match(session: tidalapi.Session, track: Track) -> MatchResult:
     """Run the Tidal lookup for one track. No caching — call via match_playlists."""
-    # Suppress tidalapi's "Track X is unavailable" messages (printed to stderr)
-    sink = io.StringIO()
-
     # 1. ISRC — dedicated API call, exact match.
     #    Prefer available tracks; keep unavailable as fallback so the ID is recorded.
     if track.isrc:
         try:
-            with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
-                hits = session.get_tracks_by_isrc(track.isrc)
+            hits = session.get_tracks_by_isrc(track.isrc)
             if hits:
                 available = [t for t in hits if getattr(t, "available", True)]
                 best = available[0] if available else hits[0]
@@ -142,8 +150,7 @@ def _do_match(session: tidalapi.Session, track: Track) -> MatchResult:
         try:
             artist = track.artists[0] if track.artists else ""
             query = f"{track.name} {artist}".strip()
-            with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
-                results = session.search(query, models=[tidalapi.Track], limit=1)
+            results = session.search(query, models=[tidalapi.Track], limit=1)
             hits = results.get("tracks", [])
             if hits:
                 return str(hits[0].id), "search", bool(getattr(hits[0], "available", True))
@@ -209,7 +216,7 @@ def match_playlists(
             _match_cache[key] = result
         return key, result
 
-    with ThreadPoolExecutor(max_workers=workers) as executor:
+    with _silence_tidalapi(), ThreadPoolExecutor(max_workers=workers) as executor:
         futures = {executor.submit(fetch, key, track): key for key, track in to_fetch.items()}
         for future in as_completed(futures):
             key = futures[future]

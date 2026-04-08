@@ -266,7 +266,7 @@ def main(
             click.echo(f"\r  {done}/{total} unique tracks resolved…  ", nl=False)
 
         match_playlists(tidal, playlists, on_progress=on_progress)
-        click.echo()  # newline after the in-place progress line
+        click.echo(f"\r  Matched {sum(len(p.tracks) for p in playlists)} tracks.           ")
 
         for p in playlists:
             click.echo(_playlist_summary(p))
